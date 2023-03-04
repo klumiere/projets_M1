@@ -1,0 +1,246 @@
+---
+title: "TP d'Assemblage de Kamély"
+author: "Kamély LUMIERE"
+date: "2022-12-05"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+#Q1/ Liste des 3-mers
+
+```{r}
+
+liste_3mers<-c("AAT","CAT","GAT","GGA","TAA","TGG","ATG","ATG","ATG","CCA","GCC","GGG","TGC","TGT")
+
+```
+
+#Q2/ Liste de tous les préfixes et suffixes
+
+
+```{r}
+
+for (i in liste_3mers){
+  pref<-c(substr(liste_3mers,1,2)) #liste des prefixes
+  suf<-c(substr(liste_3mers,2,3)) #liste des suffixes
+}
+
+pref
+suf
+
+```
+#Q3/ Liste des noeuds (préfixes et suffixes)
+
+```{r}
+
+noeuds<-unique(c(pref,suf))
+noeuds
+length(noeuds)
+```
+
+#Q4/
+
+```{r}
+
+m<-matrix(nrow = length(noeuds),ncol=length(noeuds),0);m #on crée la matrice initialisée avec que des 0
+
+rownames(m)<-noeuds
+colnames(m)<-noeuds
+m
+
+for (i in 1: length(pref)){
+  m[pref[i],suf[i]]=m[pref[i],suf[i]]+1
+}
+
+m
+
+```
+
+#Q5/
+
+```{r}
+library(network)
+g1<-network(m,loops=TRUE, directed=TRUE,labels=noeuds)
+
+```
+
+#Q6/
+
+```{r}
+pdf("G1.pdf")
+plot(g1, label=noeuds, loop.cex=4)
+dev.off()
+
+```
+
+#Q7/
+
+```{r}
+m
+m["GT","TA"]<-1
+m
+
+```
+#Q8/
+
+```{r}
+g2<-network(m,directed=TRUE,loops=TRUE,labels=noeuds)
+```
+
+#Q9/
+
+```{r}
+pdf("G2.pdf")
+plot(g2, label=noeuds, loop.cex=4)
+dev.off()
+
+```
+#Q10/
+
+```{r}
+library(graph)
+require(eulerian)
+g2 <- new("graphNEL", nodes =noeuds, edgemode="directed")
+
+for(n in 1:dim(m)[1]){
+  for(k in 1:dim(m)[1]){
+    if(m[n,k] != 0){
+      g2 <- addEdge(noeuds[n], noeuds[k], g2)
+    }
+  }
+}
+g2
+```
+#Q11/
+
+```{r}
+ecycleG2 <- eulerian(g2)
+ecycleG2
+
+```
+
+#Q12/
+
+```{r}
+noeuds<-c(noeuds,c("AT2","TG2","AT3","TG3"))
+```
+
+
+#Q13/
+```{r}
+m2 <- matrix(0, ncol = length(noeuds), nrow = length(noeuds))
+
+colnames(m2) <- noeuds
+rownames(m2) <- noeuds
+m2[1:dim(m)[1],1:dim(m)[2]]<-m
+m2["AT","TG"] <- 1
+m2["AT2","TG2"] <- 1
+m2["AT3","TG3"] <- 1
+m2["GA","AT2"] <- 1
+m2["GA","AT"] <- 0
+m2["TG3","GT"] <- 1
+m2["TG","GT"] <- 0
+m2["TG2","GC"] <- 1
+m2["TG","GC"] <- 0
+m2["CA","AT3"] <- 1
+m2["CA","AT"] <- 0
+```
+
+
+#Q14/
+```{r}
+graph3 <- network(m2, directed=TRUE, loops=TRUE)
+```
+
+
+#Q15/
+```{r}
+
+pdf("G3.pdf")
+plot(graph3, label=noeuds, loop.cex=4)
+dev.off()
+
+```
+#Q16/
+
+```{r}
+g3 <- new("graphNEL", nodes = noeuds, edgemode="directed")
+
+for(n in 1:dim(m2)[1]){
+  for(k in 1:dim(m2)[1]){
+    if(m2[n,k] != 0){
+      g3 <- addEdge(noeuds[n], noeuds[k], g3)
+    }
+  }
+}
+```
+
+#Q17/
+
+```{r}
+ecycleG3 <- eulerian(g3)
+ecycleG3
+
+```
+
+
+#Q18/
+
+Il faut déterminer le 1 er préfixe qui correspond au noeuds qui n'a pas de flèche entrante
+
+
+```{r}
+ecycleG3[ecycleG3=="AT2"]<-"AT"
+ecycleG3[ecycleG3=="AT3"]<-"AT"
+ecycleG3[ecycleG3=="TG2"]<-"TG"
+ecycleG3[ecycleG3=="TG3"]<-"TG"
+ecycleG3
+
+
+# 1/ Recherche du premier prefixe: le noeud qui est juste un suffixe mais pas un préfixe=> c'est le noeud qui correspond aux 2 premières lettres de la seq
+
+prem_pref<-c()
+
+for (i in 1: length(ecycleG3)){
+  
+  if(is.element(ecycleG3[i],suf)==FALSE){ 
+    ind_prem_pref<-i #indice du 1er prefixe dans ecycleG3
+    prem_pref<-ecycleG3[i] #valeur du prefixe de ecycleG3
+  }
+}
+print(prem_pref)
+print(ind_prem_pref)
+
+#2/ Reconstitution de la sequence
+
+
+
+part1<-c(ecycleG3[ind_prem_pref:length(ecycleG3)]);part1 #tous les noeuds de ecycleG3 à partir du 1er prefixe
+part2<-c(ecycleG3[1:ind_prem_pref-1]);part2 #la suite des noeuds de ecycleG3 
+
+seq<-c(part1,part2);seq #les noeuds de ecycleG3 dans l'ordre de la sequence
+length(seq)
+
+
+seq2<-seq[2:length(seq)]
+seq2
+x<-substr(seq2,2,2)
+y<-substr(seq[1],1,1)
+sequence<-c(y,x);sequence
+
+
+
+
+#affichage de la séquence de départ
+s<-""
+
+for (i in sequence){
+  s<-paste(s,i)
+}
+s
+
+
+
+
+```
