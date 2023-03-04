@@ -1,0 +1,703 @@
+---
+title: "TP de Statistiques"
+author: "Kamély LUMIÈRE"
+
+date: "le 17 Décembre 2023"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 2
+    number_sections: true
+fontsize: 11pt
+   
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Titanic
+
+*Le 15 avril 1912, lors de son voyage inaugural, le RMS Titanic largement considéré comme "insubmersible" a coulé après être entré en collision avec un iceberg. Malheureusement, il n'y avait pas assez de canots de sauvetage pour tout le monde à bord, ce qui a entraîné la mort de 1502 des 2224 passagers et membres d'équipage.
+Bien qu'il y ait eu un élément de chance dans la survie, il semble que certains groupes de personnes étaient plus susceptibles de survivre que d'autres.
+Dans ce défi, nous vous demandons de construire un modèle prédictif qui répond à la question : "quels types de personnes étaient les plus susceptibles de survivre ?" en utilisant les données des passagers (c'est-à-dire le nom, l'âge, le sexe, la classe socio-économique, etc.).*
+
+
+\begin{color}{violet}Présentation des données\end{color}
+
+
+Les données sont constituées de n =891 passagers qui étaient à bord du Titanic. Les variables suivantes ont été récoltés:
+
+\begin{itemize}
+\item \textbf{ PassengerID }: va qualitative représentant l'identifiant du passager
+
+
+\item \textbf{ Survived }: variable aléatoire (va) dichotomique représant la survie ou non d'un individu i ( qui prend la valeur de 1 s'il a survécu 0 sinon )
+
+\item \textbf{Pclass}: va qualitative à 3 modalités: 1, 2 ou 3
+
+\item \textbf{Name}: va qualitative représentant le nom du passager
+
+\item \textbf{Sex}: va qualitative à 2 modalités: male ou female
+
+\item \textbf{Age}: va quantitative continue représentant l'age du passager en années
+
+\item \textbf{SibSp}: va quantitative discrète représentant le nombre de frères et soeurs du passager
+
+\item \textbf{Parch}: va quantitative discrète représentant le nombre de parents du passager
+
+\item \textbf{Ticket}: va qualitative représentant le n°du ticket du passager
+
+\item \textbf{Fare}: va quantitative continue représentant le prix du ticket
+
+\item \textbf{Cabin}: va qualitative représentant la cabine
+
+\item \textbf{Embarked}: va qualitative représentant la porte d'embaquation
+
+\end{itemize}
+
+\begin{color}{violet}Chargement des librairies\end{color}
+
+
+```{r}
+library(ggplot2)
+library(stats)
+library(ISwR)
+library(MASS)
+library(Epi)
+library(ggplot2)
+library(dplyr)
+#library(lasso2)
+library(tidyr)
+library(dplyr)
+library(gridExtra)
+library(aod)
+library("ggfortify")
+library("tidyverse")
+library("reshape2")
+library(faraway)
+library(leaps)
+library(ISLR,quietly = TRUE)
+
+```
+
+
+\begin{color}{violet}Lecture des données\end{color}
+
+
+```{r}
+train <- read.csv2("train_titanic.csv")
+dim(train)
+
+typeof(train$Age) #les ages sont initialement en chr
+```
+
+
+
+
+
+
+
+```{r}
+train$Age=as.double(train$Age)#converti les ages qui étaient en chaine de caract en nb réel /!\certaines valeurs sont manquantes, d'autres sont décimales
+
+train$Fare=as.double(train$Fare) #convertit les Fare qui étaient en chr en double: prix du ticket
+train$PassengerId=as.factor(train$PassengerId)
+train$Survived=factor(train$Survived, levels=c(0,1))
+train$Pclass=factor(train$Pclass, levels=c(1,2,3))
+train$Sex=factor(train$Sex, levels=c("male","female"))
+train$Embarked=factor(train$Embarked, levels=c("S","C","Q"))
+
+train$Age2<-cut(train$Age,c(0,quantile(train$Age,c(0.25,0.5,0.75,1),na.rm = TRUE))) # on découpe la va Age en 4 classes qui correspondent chacune à un intervalle avec les quartiles: appartient ou non en dessous du 1er quartile, appartient à l'intervalle compris entre le 1er et 2è quartile, appartient ou non à l'intervalle compris entre le 2ème et 3è quartile et appartient ou non à l'intervalle compris entre le 3è et 4à quartile.
+
+train$Fare2<-cut(train$Fare,c(0,quantile(train$Fare,c(0.25,0.5,0.75,1),na.rm = TRUE)))#idem pour la va Fare
+
+
+
+attach(train)
+
+
+```
+
+
+
+```{r}
+attach(train,warn.conflicts = FALSE)
+glimpse(train)
+```
+
+
+```{r}
+summary(train)
+head(train)
+```
+
+
+
+La variable d'intérêt (la variable à expliquer) est Survived qui est une variable dichotomique qui prend la valeur de 0 si le passager i n'a pas survécu et 1 s'il a survécu à la collision.
+
+Pour étudier son lien avec les autres va, il faut que l'on utilise un modèle de régression logistique.
+
+
+
+\begin{color}{violet}Premières analyses descriptives\end{color}
+
+Nombre de survivants après la collision
+
+```{r}
+
+
+table(Survived) #0: n'a pas survécu 1: a survécu
+
+#histogramme
+
+ggplot(train, aes(x=Survived)) + geom_bar(fill="steelblue", aes(y=( ..count..)/sum(..count..))) +theme_bw()+
+   geom_text(aes(y = ((..count..)/sum(..count..)), label = scales::percent((..count..)/sum(..count..))), stat = "count", vjust = -0.25) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Répartition des passagers du Titanic (Survived=0) vs. (Survived=1)", y = "Pourcentage", x = "Survie")
+
+```
+
+
+Seulement 38% des passagers du Titanic ont survécu suite à la collision avec l'iceberg.=> La majorité sont décédés.
+
+
+
+# La survie selon l'âge des passagers
+
+
+```{r}
+#boîte à moustache
+ggplot(train,aes(Survived,Age)) + geom_boxplot(aes(fill=Survived)) + labs(title="Boxplot age selon la survie" , x="survie", y="age") 
+
+
+#histogramme
+table(Age2,Survived)
+ggplot(train, aes(x=Age2, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Age2", title= "Survie des passagers en fonction de leur âge")
+
+```
+
+
+
+On observe que les valeurs d'ages chez les survivants et les  non survivants sont distribués identiquement chez les individus Suvived=0 et les Survived=1. On remarque cependant, que les tranches d'age[20;28] et [38;80] ont une chance de survielégèrement  plus faible.
+=> Il semblerait donc qu'il y ait indépendance entre le va Survived et Age. 
+
+
+
+# Survie selon la classe des passagers
+
+```{r}
+
+table(Pclass,Survived)
+#nombre_de_passagers<-c(1:500)
+ggplot(train, aes(x=Pclass, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Pclass", title="Survie des passagers en fonction de la classe")
+
+```
+
+ On oberve que la proportion de survivants dans le Titanic est plus importante dans la classe 1 et que la proportion de décès est beaucoup plus importante dans la classe 3.
+ 
+ On observe que si le passager appartient à la classe 1, il a plus de chance de survivre que de mourir. A l'inverse, si le passager appartient à la classe 3, il a beaucoup de chance de mourir que de survivre. On constate aussi que si le passager est de classe 2, il a presque autant de chance de mourir que de survivre.
+ 
+ On oberve une différence significative du nombre de non survivant en fonction de la classe. => La varible Pclass semble être une va prédictive de la survie.
+ 
+
+
+# Survie selon le sexe des passagers
+
+```{r}
+table(Sex,Survived)
+ggplot(train, aes(x=Sex, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Sexe", title="Survie des passagers en fonction du sexe")
+```
+
+On observe qu'il y avait plus d'hommes que de femmes à bord du Titanic. La majorité (plus de tois quarts) des hommes sont morts... La majorité des femmes ont survécu.
+
+On observe une différence signicative de la survie en fonction du sexe. 
+=> Le sexe du passager semble être une variable prédictive de la survie à bord du Titanic
+
+
+
+# Survie selon la porte d'embarquement
+
+
+```{r}
+np<-1:500
+table(Embarked,Survived)
+ggplot(train, aes(x=Embarked, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Porte d'embarquement", title= "Survie des passagers en fonction de leur porte d'embarquement")
+```
+
+
+
+On observe que la majorité des passagers se trouvaient dans la porte d'embaquement S et parmi eux, plus de la moitié sont morts. Il y autant de décès que de survivants concernant les passagers de la porte d'embarquement C et Q.
+
+=> La variable Embarked semble être prédictive de la variable Survived.
+
+
+
+# Survie selon le prix du/des ticket(s) payé(s) par le passager
+
+
+
+```{r}
+np<-1:500
+table(Fare2,Survived)
+ggplot(train, aes(x=Fare2, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Prix payé pour le ticket", 
+title= "Survie des passagers en fonction du prix payé pour le(s) ticket(s) acheté(s) ")
+```
+
+On observe que les distributions des variables Survived sont très différentes selon le prix payé par le passager pour le ticket. En effet, plus le passager a payer cher son ticket, plus il semblerait qu'il ait une probabilité de survie plus élevée.
+
+=> La va Fare semblerait être une variable prédictive de la survie du passager dans le Titanic.
+
+
+
+
+# Survie selon la fratrie du passager
+
+```{r}
+table(SibSp,Survived)
+#nombre_de_passagers<-c(1:500)
+ggplot(train, aes(x=SibSp, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="SibSp", title="Survie des passagers en fonction du nb de sa fratrie")
+```
+
+
+On remarque que la majorité des passagers n'ont pas de fratrie et parmi eux, la majorité ne survie pas. On constate également qur plus le passager à une fratrie importante plus il est certain de mourir.
+En revanche, quand on a un seul frère ou soeur, on a plus de chance de survivre...
+
+On peut faire l'hypothèse que SibSp est une variable prédictive de Survived.
+
+
+
+# Survie selon le nombre de parents du passager
+
+```{r}
+table(Parch,Survived)
+#nombre_de_passagers<-c(1:500)
+ggplot(train, aes(x=Parch, fill=Survived))+
+  geom_bar() +
+  labs(y="Nombre de passagers", x="Parch", title="Survie des passagers en fonction du nb de ses parents")
+```
+
+Plus le nb de parents est dans l'intervalle[1;3] plus il a une chance de survie importante d'après cette figure.La suivie est plutot aléatoire quand Parch est >2.
+
+La varibale Parch ne semble pas vraiment être une variable prédictive de Survived.
+
+
+
+
+
+
+
+
+
+# Tests
+Y=Survived(0/1)= va à prédire d'un individu i parmi les 
+
+
+
+
+
+
+## Tests pour étudier le lien entre l'âge et la survie
+
+
+Pour étudier le lien entre les variables Age(va continue) et Survived (va non continue) , on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Age sont indépendantes \newline
+$H_1:$ Les variables Survived et Age sont liées.\newline
+
+
+
+
+```{r}
+chisq.test(Survived,Age2,correct=FALSE)
+```
+La pvalue=0.1748 >0.05 donc on ne peut conclure que les 2 variables Survived et Age ne sont pas indépendantes.
+
+```{r}
+twoby2(Survived,Age2)
+```
+La commande twoby2 (Survived, Age2) calcule:
+
+OR(odds ratio)=P(Survived=1/Age=1)* P(Survived=0/Age=1)/P(Survived=1/Age=0)* P(Survived=0/Age=0)=0.6673
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et Age2:
+OR=1 et IC(OR)95%=[0.6673;0.4379] et on a 1 appartient à l' IC(OR) et pvalue=0.0692>0.05
+
+=> On ne rejette donc pas $H_0$ avec un niveau de confiance de 1-pvalue=93,08% que les 2 va Survived et Pclass ne sont pas liées, donc Age2 n'est pas une variable explicative de Survived.
+
+
+
+
+
+## Tests pour étudier le lien entre la classe du passager et la survie
+
+
+Pour étudier le lien entre les variables Pclass et Survived qui sont deux va non continues, on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Pclass sont indépendantes \newline
+$H_1:$ Les variables Survived et Pclass sont liées.\newline
+
+
+```{r}
+chisq.test(Survived,Pclass,correct=FALSE)
+```
+ On constate que la pvalue<2.2e-16, ce qui est inférieur à 0.05, donc on rejette $H_0$.
+On peut conclure avec un niveau de confiance 1-2.2e-16= proche de 100 % que les deux variables ne sont pas indépendantes.
+=> La variable Pclass est une variable prédictive de la survie dans le Titanic.
+
+```{r}
+twoby2(Survived,Pclass)
+
+```
+
+La commande twoby2 (Survived,Pclass) calcule:
+
+OR(odds ratio)=P(Survived=1/Pclass=1) P(Survived=0/Pclass=1)/P(Survived=1/Pclass=0)P(Survived=0/Pclass=0)=0.5276
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et Pclass:
+OR=1 et IC(OR)95%=[0.3536;0.7871] et on a 1 qui n'appartient pas à l' IC(OR) et pvalue=0.0018<0.05
+
+=> On rejette donc $H_0$ avec un niveau de confiance de 1-pvalue=99,8% que les 2 va Survived et Pclass se sont pas indépendantes, donc Pclass est une variable explicative de Survived.
+
+## Tests pour étudier le lien entre le sexe du passager et la survie
+
+
+Pour étudier le lien entre les variables Sex et Survived qui sont deux va non continues, on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Sex sont indépendantes \newline
+$H_1:$ Les variables Survived et Sex sont liées.\newline
+
+
+```{r}
+chisq.test(Survived,Sex,correct=FALSE)
+
+```
+On constate que la pvalue<2.2e-16, ce qui est inférieure à 0.05 donc on peut rejetter $H_0$.
+On peut conclure avec un niveau de confiance proche de 1% que les deux variables ne sont pas indépendantes.
+=> la variable Sex est une variable prédictive de la survie.
+
+
+```{r}
+twoby2(Survived, Sex)
+```
+La commande twoby2 (Survived,Sex) calcule:
+
+OR(odds ratio)=P(Survived=1/Sex=1) P(Survived=0/Sex=1)/P(Survived=1/Sex=0)P(Survived=0/Sex=0)=12,3507 (ce qui est cohérent avec l'histogramme: on avait beaucoup plus d'hommes "morts" que de femmes "mortes")
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et Sex:
+OR=1 et IC(OR)95%=8,9;17,1393] et on a 1 n'appartient pas à l' IC(OR) et pvalue=0<0.05
+On peut donc rejetter $H_0$.
+
+On peut conclure avec un niveau de confiance proche de 100% que les deux variables ne sont pas indépendantes.
+=> la variable Sex est une variable prédictive de la survie.
+
+
+
+
+## Tests pour étudier le lien entre la porte d'embarqument du passager et la survie
+
+
+Pour étudier le lien entre les variables Embarked et Survived qui sont deux va non continues, on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Embarked sont indépendantes \newline
+$H_1:$ Les variables Survived et Embarked sont liées.\newline
+
+
+```{r}
+chisq.test(Survived,Embarked,correct=FALSE)
+
+```
+On constate que la pvalue=1.77e-6 <0.05, on peut donc rejetter $H_0$.
+On peut conclure avec un niveau de confiance proche de 100% que les deux variables ne sont pas indépendantes.
+=> La variable Embarked est une variable prédictive de la survie.
+
+
+```{r}
+twoby2(Survived,Embarked)
+```
+
+La commande twoby2 (Survived,Embarked) calcule:
+
+OR(odds ratio)=P(Survived=1/Embarked=1) P(Survived=0/Embarked=1)/P(Survived=1/Embarked=0)P(Survived=0/Embarked=0)=2,44
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et Embarked:
+OR=1 et IC(OR)95%=[1,7276;3,4463] et on a 1 n'appartient pas à l' IC(OR) et pvalue=0.00<0.05
+
+=> On rejette donc $H_0$ avec un niveau de confiance de 1-pvalue qui est proche de 100% que les 2 va Survived et Pclass se sont pas indépendantes, donc Pclass est une variable explicative de Survived.
+
+
+
+## Tests pour étudier le lien entre le prix du ticket payé par le passager et la survie
+
+Pour étudier le lien entre les variables Fare2 (va continu) et Survived(va dichotomique), on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Fare2 sont indépendantes \newline
+$H_1:$ Les variables Survived et Fare2 sont liées.\newline
+
+
+
+```{r}
+chisq.test(Survived,Fare2,correct=FALSE)
+```
+
+On constate que la pvalue=4.73e-16<0.05 donc on peut rejetter l'hypothèse $H_0.
+
+On peut conclure avec un niveau de confiance à 1-4.7e-16 (proche de 100%) que les variables Survived et Fare2 sont liées. La variable Fare2 est une variable explicative de Survived.
+
+```{r}
+twoby2(Survived,Fare2)
+```
+La commande twoby2 (Survived,Fare2) calcule:
+
+OR(odds ratio)=P(Survived=1/Fare2=1) P(Survived=0/Fare2=1)/P(Survived=1/Fare2=0)P(Survived=0/fare2=0)=1,6726
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et Pclass:
+OR=1 et IC(OR)95%=[1,0771;2,5975] et on a 1 n'appartient pas à l' IC(OR) et pvalue=0.0273<0.05
+
+=> On rejette donc $H_0$ avec un niveau de confiance de 1-pvalue=97,27% que les 2 va Survived et Fare2 se sont pas indépendantes, donc Fare2 est une variable explicative de Survived.
+
+
+
+## Tests pour étudier le lien entre la fratrie du passager et sa survie
+
+Pour étudier le lien entre les variables SibSp (va quantitative discrète) et Survived(va dichotomique), on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et SibSp sont indépendantes \newline
+$H_1:$ Les variables Survived et SibSp sont liées.\newline
+
+
+
+
+```{r}
+chisq.test(Survived,SibSp,correct=FALSE)
+```
+
+On constate que la pvalue=1.559e-06<0.05 donc on peut rejetter l'hypothèse $H_0.
+
+On peut conclure avec un niveau de confiance à 1-1.559e-06 (proche de 100%) que les variables Survived et SibSp sont liées. La variable SibSp est une variable explicative de Survived.
+
+```{r}
+twoby2(Survived,Fare2)
+```
+
+La commande twoby2 (Survived,SibSp) calcule:
+
+OR(odds ratio)=P(Survived=1/SibSp=1)* P(Survived=0/SibSp=1)/P(Survived=1/SibSp=0)*P(Survived=0/SibSp=0)
+=2,44
+
+Or sous l'hypothèse  d'indépendance $H_0$ d'indépendance des 2 variables Survived et SibSp:
+OR=1 et IC(OR)95%=[1,0771;2,5975] et on a 1 n'appartient pas à l' IC(OR) et pvalue=0.0273<0.05
+
+=> On rejette donc $H_0$ avec un niveau de confiance de 1-pvalue=97,27% que les 2 va Survived et SibSp ne se sont pas indépendantes, donc SibSp est une variable explicative de Survived.
+
+
+
+## Tests pour étudier le lien entre le nombre de parents du passager et sa survie
+
+Pour étudier le lien entre les variables Parch (va quantitative discrète) et Survived (va dichotomique), on doit réaliser un test d'indépendance de Chi2. 
+
+$H_0:$ Les variables Survived et Parch sont indépendantes \newline
+$H_1:$ Les variables Survived et Parch sont liées.\newline
+
+
+
+```{r}
+chisq.test(Survived,Parch,correct=FALSE)
+```
+
+On constate que la pvalue=9.704e-05<0.05 donc on peut rejetter l'hypothèse $H_0.
+
+On peut conclure avec un niveau de confiance à 1-9.704e-05 (proche de 100%) que les variables Survived et Parch sont liées. La variable Parch est une variable explicative de Survived.
+
+
+
+Conclusion de cette partie:
+
+D'après les tests d'indépendance de Chi2 et les calculs d'odds-ratios, on peut conclure que les variables Age, Pclass, Sex,Parch, Fare, SibSp peuvent expliquer la variable Survived.
+
+
+# Modèle de prédiction
+
+Dans cette partie, nous allons constuire un ou plusieurs de modèles de prédiction de la variable Survived à partir des variables explicatives précécentes.
+
+## Premiers modèles
+
+```{r}
+#modèle logistique avec juste l'intercept
+model.0=glm(Survived~1, family=binomial,data=train)
+summary(model.0)
+```
+On constate que l'AIC a une valeur très élevée.
+
+```{r}
+#modèle logistique en fonction de la variable Age uniquement
+
+model.Age2=glm(Survived~Age2, family=binomial, data=train)
+summary(model.Age2)
+```
+La valeur de l'AIC a diminué donc le modèle est plus prédictive que sans variables "explicatives".
+
+
+```{r}
+#modèle logistique en fonction de la va Sex
+
+model.Sex=glm(Survived~Sex, family=binomial, data=train)
+summary(model.Sex)
+
+```
+
+La valeur de l'AIC est plus faible que celle avec le modèle de régression mogistique (MRL) avec Age2. Ce modèle semple plus prédictive que le précéddent.
+
+```{r}
+#modèle logistique en fonction de la Pclass
+
+model.Pclass=glm(Survived~Pclass, family=binomial, data=train)
+summary(model.Pclass)
+
+```
+
+
+On observe ici une valeur d'AIC plus grande que celle avec les modèle avec Age2 et Sex, on ne retiendra donc pas ce modèle.
+
+
+
+
+# Modèle plus complexes
+
+```{r}
+#modèle logistique en fonction de la va Sex et Age
+
+model.Age2.Sex=glm(Survived~Age2+Sex, family=binomial, data=train)
+summary(model.Age2.Sex)
+```
+
+
+```{r}
+#modèle logistique en fonction de la va Sex, Age et Pclass
+
+model.Age2.Sex.Pclass=glm(Survived~Age2+Sex+Pclass, family=binomial, data=train)
+summary(model.Age2.Sex.Pclass)
+```
+
+
+
+```{r}
+#modèle logistique en fonction de la va Sex,Pclass et Embarked
+
+model.Sex.Pclass.Embarked=glm(Survived~Sex+Pclass+Embarked, family=binomial, data=train)
+summary(model.Sex.Pclass.Embarked)
+```
+
+
+
+```{r}
+#modèle logistique en fonction de la va Sex,Pclass, Age2 et Embarked
+
+model.Sex.Age2.Pclass.Embarked=glm(Survived~Sex+ Age2+Pclass+Embarked, family=binomial, data=train)
+summary(model.Sex.Age2.Pclass.Embarked)
+```
+
+
+```{r}
+#modèle logistique en fonction de la va Sex,Fare2,Age, Parch, SibSp
+
+model.Sex.Fare2.Age2.Parch.SibSp=glm(Survived~Sex+Fare2+Age2+Parch+SibSp, family=binomial, data=train)
+summary(model.Sex.Fare2.Age2.Parch.SibSp)
+```
+
+On remarque que ce modèle a une vakleur d'AIC plus faible que le modèle précédent qui a le m^me nombre de variables, donc le modèle avec les variables Sex,Pclass, Age2 et Embarked est plus prédictif que celui-ci. Cependant, le modeèle avec Age2, Sex et Pclass a un AIC de 666 et le modèle avec les variables Age2, Sex Embarked et Pclass est de 665 (modèle avec 1 variable de plus qui est Embarked), cela signifie que Embarked n'approte pas grand chose au modèle, on peut se contenter d'un modèle avec moins de varibale donc le modèle avec comme variables explicatives: Age2, Sex et Pclass.
+
+On retiendra ce modèle comme celui le plus prédictif car la valeur d'AIC la plus faible en minimisant le nombre de variables. 
+
+
+```{r}
+
+```
+
+
+
+
+# Modèle complet
+
+```{r}
+#modèle logistique en fonction de toutes les varibales explicatives
+mc = glm(Survived ~Pclass+Sex+Age2+SibSp+Parch+Embarked+Fare2, family = "binomial",
+data=train)
+summary(mc)
+
+```
+
+
+On observe une valeur d'AIC proche de celle du modèle que l'on a retenu. 666 est proche de 657...
+
+
+
+```{r}
+modselect_st=stepAIC(model.Age2.Sex.Pclass, trace=FALSE,direction=c("both"), data=train)
+summary(modselect_st)
+```
+On remarque que toutes les variables du modèles ont été retenus donc elles sont très probablement explicatives de la variable Survived et le modèle est plutôt satisfaisant.
+
+
+
+#Prédiction et qualité du modèle
+
+```{r}
+
+
+
+```
+
+# Courbes AUC
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
