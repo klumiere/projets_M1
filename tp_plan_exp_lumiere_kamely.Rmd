@@ -1,0 +1,159 @@
+---
+title: "Projet Planification d'expériences"
+author: "Kamély LUMIÈRE"
+date: "10 février 2023"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 2
+    number_sections: true
+fontsize: 11pt
+   
+---
+
+
+*Dans un jeu télévisé, on montre trois portes fermées à chaque candidat. Derrière l’une d’entre elles
+se cache une voiture. Il suffit d’indiquer la bonne porte pour gagner.
+Le candidat désigne une porte mais pour l’instant celle-ci reste fermée. Ensuite le présentateur
+ouvre l’une des deux portes restantes qui ne cachent pas de voiture
+Le candidat a le choix entre maintenir son premier choix ou le modifier.
+Stratégie 1 : le candidat ne change pas d’avis
+Stratégie 2 : le candidat modifie son choix*
+
+
+
+# Q1/
+## Stratégie 1
+
+```{r}
+simu_s1<-function(nb_portes, nb_simu){ #stratégie 1 où le candidat ne change pas d'avis après avoir découvert la porte montrée par le présentateur
+  #n= nb de portes et nb_simu=nb de fois que l'on répète le jeu
+  Gagne<-NULL; #vecteur contenant les pertes et gains au jeu
+  
+  for (i in 1:nb_simu) {
+  Portes<-paste("P",as.character(1:nb_portes), sep=""); Portes #vecteur correspondant aux différentes portes
+  Montre<-paste("M",as.character(1:nb_portes), sep=""); Montre #vecteur correspondant aux différentes portes que peut montrer le présentateur
+  
+  
+  Voiture<-sample(Portes,1);Voiture #on cache la voiture dans l'une des 3 portes de manière aléatoire
+  
+  Choix<-sample(Portes,1); Choix #le candidat choisit au hasard une des 3 portes pour gagner la voiture
+  
+  if(Choix==Voiture){ #si le candidat choisit la porte derrière laquelle il y a la voiture
+    
+    Montre<-sample(Portes[Portes!=Voiture],1)  #on montre une porte derrière laquelle il n'y a pas de voiture
+    Gagne<-append(Gagne,T);  # le joueur a gagné!
+    
+  }
+  
+  else{  #si le candidat choisit la porte derrière laquelle il n' y a pas la voiture
+  Montre<-sample(Portes[Portes!=Voiture & Portes!=Choix])  #on montre la porte qui n'a pas été choisie et derrière laquelle il n'y a pas de voiture
+  Gagne<-append(Gagne,F) # le joueur a perdu...
+  
+  }
+  
+  #print(i)
+  #print(Gagne)
+  }
+  
+  
+  return(length(Gagne[Gagne==T])/nb_simu)  #on calcule le nb de fois que l'on a gagné sur le nb de fois qu'ona joué= proba de gagner le jeu avec cette stratégie
+  
+  
+}
+  
+simu_s1(3,10)
+
+
+s<-function(nb_portes=3,nb_simu=1){
+  simu_s1(nb_portes,nb_simu)
+}
+```
+
+
+## Stratégie 2
+
+
+
+
+```{r}
+simu_s2<-function(nb_portes, nb_simu){ #stratégie 2 où le candidat change d'avis après avoir découvert la porte montrée par le présentateur
+  #n=nombre de portes, nb_simu= nb de fois qu'on répète le jeu
+  Gagne<-NULL; #vecteur contenant les pertes et gains au jeu
+  
+  for (i in 1:nb_simu) {
+    Portes<-paste("P",as.character(1:nb_portes), sep=""); Portes
+    Montre<-paste("M",as.character(1:nb_portes), sep=""); Montre
+    
+    
+    
+    Voiture<-sample(Portes,1);Voiture #on cache la voiture dans l'une des 3 portes de manière aléatoire
+    
+    Choix<-sample(Portes,1); Choix #le candidat choisit au hasard une des 3 portes pour gagner la voiture
+    
+    if(Choix==Voiture){ #si le candidat choisit la porte derrière laquelle il y a la voiture
+      
+      Montre<-sample(Portes[Portes!=Voiture],1) #on montre une porte derrière laquelle il n'y a pas de voiture
+      Choix<-sample(Portes[Portes!=Voiture & Portes!=Choix],1) #s'il change d'avis il va forcémment choisir une porte qui n'a plus la voiture derrière elle
+      Gagne<-append(Gagne,F);  # le joueur a perdu...
+      
+    }
+    
+    else{  #si le candidat choisit la porte derrière laquelle il n' y a pas la voiture
+      Montre<-sample(Portes[Portes!=Voiture & Portes!=Choix])  #on montre la porte qui n'a pas été choisie et derrière laquelle il n'y a pas de voiture
+      Choix<-sample(Portes[Portes!=Montre & Portes==Choix],1) # s'il change d'avis, il va forcémment choisir la porte avec la voiture
+      Gagne<-append(Gagne,T) # le joueur a gagné!!
+      
+    }
+    
+    #print(i)
+    #print(Gagne)
+  }
+  
+  
+  return(length(Gagne[Gagne==T])/nb_simu)  #on calcule le nb de fois que l'on a gagné sur le nb de fois qu'on a joué
+  
+  
+}
+
+simu_s2(3,10)
+
+
+```
+
+
+
+##Q2/
+
+On répète un grand nombre de fois chacune des stratégies
+
+```{r}
+
+simu_s1(nb_portes = 3, nb_simu=1000) #la proba tend vers 0.33
+simu_s2(nb_portes=3,nb_simu=1000) #la proba se rapproche de 0.66
+```
+La stratégie 2 me semble être la meilleure car la probabilité de gagner est plus grande avec la stratégie 2 que la 1 (0.66>0.33)
+
+
+## Q3/
+
+voir image en pièce jointe 
+
+On se rend compte d'après ces deux simulations, que la probabilité de gagner avec la stratégie 2 est plus grande (2/3=0.66) que la stratégie 1( 1/3=0.333).
+Si le candidat adopte la 2ème stratégie qui est de changer d'avis après avoir découvert ce qu'il y a ou pas derrière la porte montrée par le présentateur, la probabilité de gagner va être différente de la stratégie 1. En effet, s'il choisit la bonne porte avec la voiture dès le début, et qu'il change d'avis il est sûr de perdre (1/3 de trouver la bonne porte au début), mais s'il se trompe de porte au début (2/3) et qu'il change d'avis après que le présentateur lui ai montré une porte qui est forcémment une porte derrière laquelle il n'y a pas la voiture, en changeant de porte il est obligé de choisir la porte avec la voiture donc avec une probabilité de 2/3 avec cette stratégie. (voir l'arbre de probabilité en pièce jointe du mail) La stratégie 2 me semble donc être la meilleure.
+
+## Q4/
+
+```{r}
+#avec 4 portes
+simu_s1(nb_portes = 4, nb_simu=1000) 
+simu_s2(nb_portes=4,nb_simu=1000) 
+
+#avec 10 portes
+simu_s1(nb_portes = 10, nb_simu=1000) 
+simu_s2(nb_portes=10,nb_simu=1000) 
+
+#la proba de gagner diminue quand le nb de porte augmente 
+```
