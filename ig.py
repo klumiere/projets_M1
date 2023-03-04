@@ -1,4 +1,4 @@
-## Projet démineur Kamély LUMIERE 20190541 M1 GENIOMHE (fait seule)
+## Projet démineur Kamély LUMIERE 
 ## interface graphique pas terminée ### ###affichage de la grille "dysfonctionnelle"##
 from tkinter import *
 import tkinter
