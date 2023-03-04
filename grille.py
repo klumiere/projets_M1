@@ -1,4 +1,4 @@
-## Projet démineur Kamély LUMIERE 20190541 M1 GENIOMHE (fait seule)
+## Projet démineur Kamély LUMIERE 
 ##programme avec l'affiche de la grille initiale uniquement###
 
 from tkinter import *
